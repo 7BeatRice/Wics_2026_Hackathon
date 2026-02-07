@@ -1,0 +1,32 @@
+/* MixMatched Dark Mode - Bumble-Inspired Color System */
+
+:root {
+  /* Light Mode Colors */
+  --bg-primary-light: #FFFFFF;
+  --bg-secondary-light: #F8F8F8;
+  --bg-card-light: #FFFFFF;
+  --text-primary-light: #1A1A1A;
+  --text-secondary-light: #6B6B6B;
+  --text-tertiary-light: #9A9A9A;
+  
+  /* Dark Mode Colors - Bumble Inspired */
+  --bg-primary-dark: #121212;
+  --bg-secondary-dark: #1C1C1E;
+  --bg-card-dark: #1C1C1E;
+  --bg-elevated-dark: #232326;
+  --border-dark: #2C2C30;
+  --divider-dark: #2A2A2D;
+  
+  --text-primary-dark: #F2F2F2;
+  --text-secondary-dark: #B0B0B5;
+  --text-tertiary-dark: #7A7A80;
+  
+  /* Bumble Yellow - Dark Mode Optimized */
+  --yellow-primary: #F5C542;
+  --yellow-secondary: #D4A937;
+  --yellow-glow: #FFD76A;
+  
+  /* Icons */
+  --icon-inactive-dark: #9A9AA0;
+  --icon-active-dark: #F5C542;
+}
