@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Music, MapPin } from 'lucide-react';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { db, auth } from '../../firebase.ts';
 
 interface MatchListScreenProps {
   onBack: () => void;
@@ -8,7 +10,7 @@ interface MatchListScreenProps {
   darkMode: boolean;
 }
 
-const allMatches = [
+const matches = [
   {
     name: 'Alex',
     age: 24,
@@ -60,6 +62,49 @@ const allMatches = [
 ];
 
 export function MatchListScreen({ onBack, onSelectMatch, darkMode }: MatchListScreenProps) {
+  const [matches, setMatches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMatches = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        // For the demo: Fetch all users except yourself 
+        // In a real app, you'd query a "matches" subcollection
+        const q = query(
+          collection(db, "users"),
+          where("uid", "!=", currentUser.uid),
+          limit(10)
+        );
+
+        const querySnapshot = await getDocs(q);
+        const fetched = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          // Ensure these fields exist or provide defaults for the UI
+          name: doc.data().name || "Music Fan",
+          age: doc.data().age || 21,
+          match: doc.data().match || Math.floor(Math.random() * 20) + 80,
+          distance: doc.data().distance || "0.5 mi",
+          artists: doc.data().musicProfile?.genres || ["Live Music"],
+          gradient: doc.data().gradient || "from-purple-500 to-blue-500"
+        }));
+
+        setMatches(fetched);
+      } catch (err) {
+        console.error("Error fetching match list:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMatches();
+  }, []);
+
+  console.log("Current Match List:", matches);
+  if (loading) return <div className="h-full flex items-center justify-center">Loading matches...</div>;
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -88,65 +133,25 @@ export function MatchListScreen({ onBack, onSelectMatch, darkMode }: MatchListSc
         <p className={`text-sm text-center ${darkMode ? 'text-[#B0B0B5]' : 'text-gray-600'}`}>Tap any match to start finding them</p>
       </div>
 
-      {/* Match List */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="space-y-3 pb-4">
-          {allMatches.map((match, index) => (
-            <motion.button
-              key={index}
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: index * 0.1 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onSelectMatch(index)}
-              className={`w-full rounded-3xl p-4 shadow-sm border-2 transition-colors text-left ${
-                darkMode
-                  ? 'bg-[#1C1C1E] border-[#2C2C30] hover:border-[#F5C542]'
-                  : 'bg-white border-gray-100 hover:border-yellow-300'
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                {/* Avatar */}
-                <div className={`w-20 h-20 bg-gradient-to-br ${match.gradient} rounded-2xl flex items-center justify-center flex-shrink-0`}>
-                  <Music className="w-10 h-10 text-white" strokeWidth={1.5} />
+        {/* Match List */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <div className="space-y-3 pb-4">
+                  {matches.map((match, index) => (
+          <motion.button
+            key={match.id || index}
+            // ... existing props
+            onClick={() => onSelectMatch(match)} // Pass the whole match object!
+          >
+            {/* ... avatar and info ... */}
+            <div className="flex flex-wrap gap-1">
+              {(match.artists || []).slice(0, 2).map((artist: string, i: number) => (
+                <div key={i} className="...">
+                  <span className="text-xs font-medium">{artist}</span>
                 </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className={`text-lg font-bold ${darkMode ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>
-                      {match.name}, {match.age}
-                    </h3>
-                    <div className={`rounded-full px-3 py-1 ${darkMode ? 'bg-[#232326]' : 'bg-green-100'}`}>
-                      <span className={`text-xs font-bold ${darkMode ? 'text-[#F5C542]' : 'text-green-700'}`}>{match.match}%</span>
-                    </div>
-                  </div>
-                  
-                  <p className={`text-sm flex items-center gap-1 mb-2 ${darkMode ? 'text-[#B0B0B5]' : 'text-gray-600'}`}>
-                    <MapPin className="w-3 h-3" />
-                    {match.distance} away
-                  </p>
-
-                  <div className="flex flex-wrap gap-1">
-                    {match.artists.slice(0, 2).map((artist, i) => (
-                      <div key={i} className={`rounded-full px-2 py-1 border ${
-                        darkMode
-                          ? 'bg-[#232326] border-[#2C2C30] text-[#F2F2F2]'
-                          : 'bg-yellow-50 border-yellow-200 text-gray-800'
-                      }`}>
-                        <span className="text-xs font-medium">{artist}</span>
-                      </div>
-                    ))}
-                    {match.artists.length > 2 && (
-                      <div className={`rounded-full px-2 py-1 ${darkMode ? 'bg-[#F5C542]' : 'bg-yellow-400'}`}>
-                        <span className="text-xs font-bold text-gray-900">+{match.artists.length - 2}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.button>
-          ))}
+              ))}
+            </div>
+          </motion.button>
+        ))}
         </div>
       </div>
     </motion.div>

@@ -125,7 +125,7 @@ export default function App() {
               <IntentPreferenceScreen key="intent" onNext={() => setCurrentScreen('analysis')} darkMode={darkMode} />
             )}
             {currentScreen === 'analysis' && (
-              <AnalysisLoadingScreen key="analysis" darkMode={darkMode} />
+              <AnalysisLoadingScreen key="analysis" darkMode={darkMode} onFinished={() => setCurrentScreen('analysis')} />
             )}
             {currentScreen === 'matches' && (
               <MatchDiscoveryScreen key="matches" onMatch={() => setCurrentScreen('matchrequest')} onViewAll={() => setCurrentScreen('matchlist')} darkMode={darkMode} />

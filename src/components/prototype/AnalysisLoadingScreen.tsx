@@ -4,25 +4,20 @@ import { Music, Disc3, Sparkles } from 'lucide-react';
 
 interface AnalysisLoadingScreenProps {
   darkMode: boolean;
+  onFinished: () => void;
 }
 
-export function AnalysisLoadingScreen({ darkMode }: AnalysisLoadingScreenProps) {
+export function AnalysisLoadingScreen({ darkMode, onFinished}: AnalysisLoadingScreenProps) {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 5;
-      });
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, []);
-  
+    if (progress >= 100) {
+      // Small delay so the user sees 100% before it switches
+      const timer = setTimeout(() => onFinished(), 500); 
+      return () => clearTimeout(timer);
+    }
+  }, [progress, onFinished]);
+  console.log("Analysis complete, moving to discovery...");
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -139,3 +134,4 @@ export function AnalysisLoadingScreen({ darkMode }: AnalysisLoadingScreenProps) 
     </motion.div>
   );
 }
+
