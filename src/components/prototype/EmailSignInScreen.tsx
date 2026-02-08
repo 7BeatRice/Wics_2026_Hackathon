@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Mail, ArrowRight } from 'lucide-react';
+import {auth} from '../../firebase.ts';
+import{signInWithEmailAndPassword, createUserWithEmailAndPassword} from 'firebase/auth';
+import type firebase from 'firebase/compat/app';  
 
 interface EmailSignInScreenProps {
   onNext: () => void;
@@ -9,6 +12,39 @@ interface EmailSignInScreenProps {
 
 export function EmailSignInScreen({ onNext, darkMode }: EmailSignInScreenProps) {
   const [email, setEmail] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const[password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleAuth = async () =>{
+    setError(''); 
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    try{
+      if (isRegistering){
+        await createUserWithEmailAndPassword(auth, email, password);
+        console.log("Account Created!");
+      }
+      else{
+        await signInWithEmailAndPassword(auth, email, password);
+        console.log("Signed in!");
+      }
+      setEmail("");
+    setPassword("");
+    onNext();
+    }
+    catch (error: any){
+        if (error.code === 'auth/invalid-credential') {
+        setError('Invalid email or password.');
+      } else if (error.code === 'auth/email-already-in-use') {
+        setError('This email is already registered.');
+      } else {
+        setError('An error occurred. Please try again.');
+      }
+    }
+  }
 
   return (
     <motion.div
@@ -36,8 +72,12 @@ export function EmailSignInScreen({ onNext, darkMode }: EmailSignInScreenProps) 
           <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full mx-auto mb-6 flex items-center justify-center">
             <Mail className="w-10 h-10 text-white" strokeWidth={2.5} />
           </div>
-          <h2 className={`text-3xl font-bold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Welcome back!</h2>
-          <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Sign in to find your festival crew</p>
+          <h2 className={`text-3xl font-bold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            {isRegistering? "Welcome!": "Welcome Back!"}
+          </h2>
+          <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+            {isRegistering? "Create an account to find your fesitival crew": "Sign in to find your festival crew"}
+          </p>
         </motion.div>
 
         <motion.div
@@ -66,6 +106,7 @@ export function EmailSignInScreen({ onNext, darkMode }: EmailSignInScreenProps) 
             <input
               type="password"
               placeholder="••••••••"
+              onChange = {(e) => setPassword(e.target.value)}
               className={`w-full px-6 py-4 rounded-full border-2 focus:outline-none transition-colors ${
                 darkMode 
                   ? 'bg-[#1C1C1E] border-[#2C2C30] focus:border-[#F5C542] text-[#F2F2F2] placeholder-[#7A7A80]'
@@ -82,10 +123,18 @@ export function EmailSignInScreen({ onNext, darkMode }: EmailSignInScreenProps) 
         transition={{ delay: 0.5 }}
         className="space-y-3"
       >
+        {error && (
+            <motion.p 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-red-500 text-sm text-center font-medium mb-4"
+            >
+              {error}
+            </motion.p>
+          )}
         <motion.button
           whileTap={{ scale: 0.95 }}
-          onClick={onNext}
-          disabled={!email}
+          onClick={handleAuth}
           className={`w-full font-bold py-5 rounded-full text-lg shadow-lg transition-all ${
             email
               ? darkMode
@@ -96,10 +145,15 @@ export function EmailSignInScreen({ onNext, darkMode }: EmailSignInScreenProps) 
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
-          Continue
+          {isRegistering? "Create Account": "Continue"}
         </motion.button>
         <p className={`text-center text-sm ${darkMode ? 'text-[#7A7A80]' : 'text-gray-500'}`}>
-          New here? <span className={`font-semibold ${darkMode ? 'text-[#F5C542]' : 'text-yellow-600'}`}>Create account</span>
+          {isRegistering? "Already have an account?": "New here?"}
+          <button
+            onClick={()=> {setIsRegistering(!isRegistering); setEmail(""); setPassword("")}}
+            className={`font-semibold ${darkMode ? 'text-[#F5C542]' : 'text-yellow-600'}`}>
+              {isRegistering? " Sign in": "  Create Account"}
+           </button>
         </p>
       </motion.div>
     </motion.div>
