@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Music, Sparkles } from 'lucide-react';
+import { Music, Sparkles, Database } from 'lucide-react'; // Added Database icon for the seed button
+import { seedFakeUsers } from '../seed.ts'; 
 
 interface SplashScreenProps {
   onNext: () => void;
@@ -14,13 +15,27 @@ export function SplashScreen({ onNext, darkMode }: SplashScreenProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.1 }}
       transition={{ duration: 0.5 }}
-      className={`h-full flex flex-col items-center justify-center p-8 ${
+      className={`h-full flex flex-col items-center justify-center p-8 relative ${
         darkMode 
           ? 'bg-[#121212]' 
           : 'bg-gradient-to-b from-yellow-400 via-yellow-300 to-white'
       }`}
       onClick={onNext}
     >
+      {/* Hidden/Subtle Seed Button for Testing */}
+      <button 
+        onClick={(e) => {
+          e.stopPropagation(); // Prevents clicking the button from triggering onNext
+          seedFakeUsers();
+        }}
+        className={`absolute top-16 right-8 p-2 rounded-full opacity-20 hover:opacity-100 transition-opacity ${
+          darkMode ? 'text-white' : 'text-gray-900'
+        }`}
+        title="Seed Database"
+      >
+        <Database size={16} />
+      </button>
+
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -59,6 +74,7 @@ export function SplashScreen({ onNext, darkMode }: SplashScreenProps) {
         Find your music match at ACL
       </motion.p>
 
+      {/* Loading Dots */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -66,21 +82,14 @@ export function SplashScreen({ onNext, darkMode }: SplashScreenProps) {
         className="absolute bottom-20"
       >
         <div className="flex gap-2">
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className={`w-2 h-2 rounded-full ${darkMode ? 'bg-[#7A7A80]' : 'bg-gray-900'}`}
-          ></motion.div>
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
-            className={`w-2 h-2 rounded-full ${darkMode ? 'bg-[#7A7A80]' : 'bg-gray-900'}`}
-          ></motion.div>
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
-            className={`w-2 h-2 rounded-full ${darkMode ? 'bg-[#7A7A80]' : 'bg-gray-900'}`}
-          ></motion.div>
+          {[0, 0.2, 0.4].map((delay, i) => (
+            <motion.div
+              key={i}
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity, delay }}
+              className={`w-2 h-2 rounded-full ${darkMode ? 'bg-[#7A7A80]' : 'bg-gray-900'}`}
+            ></motion.div>
+          ))}
         </div>
       </motion.div>
     </motion.div>

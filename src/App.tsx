@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence } from 'framer-motion';
+import { auth, db } from './firebase.ts'; 
+import { collection, getDocs, getDoc, doc, query, limit } from 'firebase/firestore';
+
+// Component Imports
 import { SplashScreen } from './components/prototype/SplashScreen.js';
 import { OnboardingScreen } from './components/prototype/OnboardingScreen.js';
 import { EmailSignInScreen } from './components/prototype/EmailSignInScreen.js';
@@ -15,68 +19,107 @@ import { LiveNavigationScreen } from './components/prototype/LiveNavigationScree
 import { ProximityHeartbeatScreen } from './components/prototype/ProximityHeartbeatScreen.js';
 import { MeetMomentScreen } from './components/prototype/MeetMomentScreen.js';
 import { EndingScreen } from './components/prototype/EndingScreen.js';
-
 import { ThemeToggle } from './components/ThemeToggle.js';
 
-type Screen = 
-  | 'splash'
-  | 'onboarding'
-  | 'email'
-  | 'photo'
-  | 'music'
-  | 'intent'
-  | 'analysis'
-  | 'matches'
-  | 'matchlist'
-  | 'matchrequest'
-  | 'confirmation'
-  | 'navigation'
-  | 'proximity'
-  | 'meet'
-  | 'ending';
+type Screen = 'splash' | 'onboarding' | 'email' | 'photo' | 'music' | 'intent' | 'analysis' | 'matches' | 'matchlist' | 'matchrequest' | 'confirmation' | 'navigation' | 'proximity' | 'meet' | 'ending';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
   const [darkMode, setDarkMode] = useState(false);
+  const [allMatches, setAllMatches] = useState<any[]>([]);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<any>(null);
+
+  const loadFestivalMatches = async () => {
+  setLoadingMatches(true);
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.log("No auth user found");
+      return;
+    }
+
+    // 1. Get current user's data
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    
+    // DEBUG: See if YOUR data exists
+    if (!userDoc.exists()) {
+       console.error("Current user doc does not exist in Firestore! Check your onboarding save logic.");
+    }
+
+    const myData = userDoc.data();
+    const myGenres: string[] = (myData?.genres || []).map((g: string) => g.toLowerCase());
+
+    // 2. Fetch potential matches 
+    // REMOVED the "where" filter temporarily to ensure data flows
+    const q = query(collection(db, "users"), limit(30));
+    const snap = await getDocs(q);
+    
+    console.log(`Found ${snap.docs.length} total users in DB`);
+
+    const data = snap.docs
+      .map((docSnap: any) => {
+        const d = docSnap.data();
+        
+
+        const theirGenres: string[] = d.genres || [];
+        const theirGenresLower = theirGenres.map((g: string) => g.toLowerCase());
+        
+        const intersection = myGenres.filter((g: string) => theirGenresLower.includes(g));
+        const union = new Set([...myGenres, ...theirGenresLower]);
+        
+        // If no genres match, give a random score so the UI isn't empty
+        const score = union.size > 0 
+          ? Math.round((intersection.length / union.size) * 100) 
+          : Math.floor(Math.random() * 30) + 50; 
+
+        return {
+          id: docSnap.id,
+          name: d.displayName || "Festival Fan",
+          age: d.age || 21,
+          artists: theirGenres,
+          match: score,
+          gradient: d.gradient || "from-yellow-400 to-orange-500",
+          location: d.location || "Nearby",
+          isFake: d.isFake || false
+        };
+      })
+      .filter(Boolean); // Remove the 'null' entries (yourself)
+
+    console.log("Processed Matches:", data);
+    setAllMatches(data);
+  } catch (err) {
+    console.error("Match error:", err);
+  } finally {
+    setLoadingMatches(false);
+  }
+};
 
   useEffect(() => {
-    // Auto-transition from splash after 2 seconds
-    if (currentScreen === 'splash') {
-      const timer = setTimeout(() => {
-        setCurrentScreen('onboarding');
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
+    // Timer and Navigation Maps for type-safety
+    const timers: Partial<Record<Screen, number>> = {
+      splash: 2500,
+      analysis: 4000,
+      matchrequest: 3000,
+      confirmation: 2500,
+      proximity: 3000
+    };
 
-    // Auto-transition from analysis after 4 seconds
-    if (currentScreen === 'analysis') {
-      const timer = setTimeout(() => {
-        setCurrentScreen('matches');
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
+    const nextScreenMap: Partial<Record<Screen, Screen>> = {
+      splash: 'onboarding',
+      analysis: 'matches',
+      matchrequest: 'confirmation',
+      confirmation: 'navigation',
+      proximity: 'meet'
+    };
 
-    // Auto-transition from match request after 3 seconds (simulating acceptance)
-    if (currentScreen === 'matchrequest') {
-      const timer = setTimeout(() => {
-        setCurrentScreen('confirmation');
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
+    if (currentScreen === 'analysis') loadFestivalMatches();
 
-    // Auto-transition from confirmation after 2.5 seconds
-    if (currentScreen === 'confirmation') {
-      const timer = setTimeout(() => {
-        setCurrentScreen('navigation');
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
+    const waitTime = timers[currentScreen];
+    const nextTarget = nextScreenMap[currentScreen];
 
-    // Auto-transition from proximity after 3 seconds
-    if (currentScreen === 'proximity') {
-      const timer = setTimeout(() => {
-        setCurrentScreen('meet');
-      }, 3000);
+    if (waitTime && nextTarget) {
+      const timer = setTimeout(() => setCurrentScreen(nextTarget), waitTime);
       return () => clearTimeout(timer);
     }
   }, [currentScreen]);
@@ -87,82 +130,79 @@ export default function App() {
       <div className={`relative w-full max-w-[400px] h-[844px] rounded-[60px] shadow-2xl overflow-hidden border-8 transition-colors ${
         darkMode ? 'bg-[#121212] border-[#1C1C1E]' : 'bg-white border-gray-900'
       }`}>
+        
         {/* Status Bar */}
         <div className={`absolute top-0 left-0 right-0 h-11 z-50 flex items-center justify-between px-8 pt-2 ${
           darkMode ? 'bg-[#121212]' : 'bg-white'
         }`}>
-          <span className={`text-sm font-semibold ${darkMode ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>9:41</span>
-          <div className="flex items-center gap-1">
-            <div className={`w-4 h-3 border rounded-sm ${darkMode ? 'border-[#F2F2F2]' : 'border-gray-900'}`}></div>
-            <div className={`w-4 h-3 border rounded-sm ${darkMode ? 'border-[#F2F2F2]' : 'border-gray-900'}`}></div>
-            <div className={`w-6 h-3 border rounded-sm relative ${darkMode ? 'border-[#F2F2F2]' : 'border-gray-900'}`}>
-              <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-1 h-1.5 rounded-r-sm ${darkMode ? 'bg-[#F2F2F2]' : 'bg-gray-900'}`}></div>
+          <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>9:41</span>
+          <div className="flex gap-1">
+            <div className={`w-4 h-2.5 border rounded-sm ${darkMode ? 'border-white' : 'border-gray-900'}`} />
+            <div className={`w-5 h-3 border-2 rounded-sm relative ${darkMode ? 'border-white' : 'border-gray-900'}`}>
+              <div className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-1 h-1 rounded-r-sm ${darkMode ? 'bg-white' : 'bg-gray-900'}`} />
             </div>
           </div>
         </div>
 
-        {/* Screen Content */}
         <div className="h-full pt-11">
           <ThemeToggle darkMode={darkMode} onToggle={() => setDarkMode(!darkMode)} />
           
           <AnimatePresence mode="wait">
-            {currentScreen === 'splash' && (
-              <SplashScreen key="splash" onNext={() => setCurrentScreen('onboarding')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'onboarding' && (
-              <OnboardingScreen key="onboarding" onNext={() => setCurrentScreen('email')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'email' && (
-              <EmailSignInScreen key="email" onNext={() => setCurrentScreen('photo')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'photo' && (
-              <PhotoUploadScreen key="photo" onNext={() => setCurrentScreen('music')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'music' && (
-              <MusicInputScreen key="music" onNext={() => setCurrentScreen('intent')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'intent' && (
-              <IntentPreferenceScreen key="intent" onNext={() => setCurrentScreen('analysis')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'analysis' && (
-              <AnalysisLoadingScreen key="analysis" darkMode={darkMode} onFinished={() => setCurrentScreen('analysis')} />
-            )}
+            {currentScreen === 'splash' && <SplashScreen key="s" onNext={() => setCurrentScreen('onboarding')} darkMode={darkMode} />}
+            {currentScreen === 'onboarding' && <OnboardingScreen key="o" onNext={() => setCurrentScreen('email')} darkMode={darkMode} />}
+            {currentScreen === 'email' && <EmailSignInScreen key="e" onNext={() => setCurrentScreen('photo')} darkMode={darkMode} />}
+            {currentScreen === 'photo' && <PhotoUploadScreen key="p" onNext={() => setCurrentScreen('music')} darkMode={darkMode} />}
+            {currentScreen === 'music' && <MusicInputScreen key="m" onNext={() => setCurrentScreen('intent')} darkMode={darkMode} />}
+            {currentScreen === 'intent' && <IntentPreferenceScreen key="i" onNext={() => setCurrentScreen('analysis')} darkMode={darkMode} />}
+            {currentScreen === 'analysis' && <AnalysisLoadingScreen key="a" darkMode={darkMode} onFinished={() => {}} />}
+            
             {currentScreen === 'matches' && (
-              <MatchDiscoveryScreen key="matches" onMatch={() => setCurrentScreen('matchrequest')} onViewAll={() => setCurrentScreen('matchlist')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'matchlist' && (
-              <MatchListScreen 
-                key="matchlist" 
-                onBack={() => setCurrentScreen('matches')} 
-                onSelectMatch={() => setCurrentScreen('matchrequest')}
+              <MatchDiscoveryScreen 
+                key="ds" 
+                realMatches={allMatches} 
                 darkMode={darkMode}
+                onViewAll={() => setCurrentScreen('matchlist')}
+                onMatch={(match) => { setSelectedMatch(match); setCurrentScreen('matchrequest'); }}
               />
             )}
+
+            {currentScreen === 'matchlist' && (
+              <MatchListScreen 
+                key="ml" 
+                matches={allMatches} 
+                darkMode={darkMode}
+                onBack={() => setCurrentScreen('matches')}
+                onSelectMatch={(match) => { setSelectedMatch(match); setCurrentScreen('matchrequest'); }}
+              />
+            )}
+
             {currentScreen === 'matchrequest' && (
-              <MatchRequestScreen key="matchrequest" onContinue={() => setCurrentScreen('confirmation')} darkMode={darkMode} />
+              <MatchRequestScreen 
+                key="mr" 
+                matchName={selectedMatch?.name || "Music Fan"} 
+                darkMode={darkMode}
+                onContinue={() => setCurrentScreen('confirmation')}
+              />
             )}
+
             {currentScreen === 'confirmation' && (
-              <MatchConfirmationScreen key="confirmation" darkMode={darkMode} />
+              <MatchConfirmationScreen 
+                key="c" 
+                matchName={selectedMatch?.name || "Music Fan"} // Now correctly passed
+                darkMode={darkMode} 
+              />
             )}
-            {currentScreen === 'navigation' && (
-              <LiveNavigationScreen key="navigation" onProximity={() => setCurrentScreen('proximity')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'proximity' && (
-              <ProximityHeartbeatScreen key="proximity" darkMode={darkMode} />
-            )}
-            {currentScreen === 'meet' && (
-              <MeetMomentScreen key="meet" onNext={() => setCurrentScreen('ending')} darkMode={darkMode} />
-            )}
-            {currentScreen === 'ending' && (
-              <EndingScreen key="ending" onRestart={() => setCurrentScreen('matches')} darkMode={darkMode} />
-            )}
+
+            {currentScreen === 'navigation' && <LiveNavigationScreen key="n" onProximity={() => setCurrentScreen('proximity')} darkMode={darkMode} />}
+            {currentScreen === 'proximity' && <ProximityHeartbeatScreen key="ph" darkMode={darkMode} />}
+            {currentScreen === 'meet' && <MeetMomentScreen key="mm" onNext={() => setCurrentScreen('ending')} darkMode={darkMode} />}
+            {currentScreen === 'ending' && <EndingScreen key="end" onRestart={() => setCurrentScreen('matches')} darkMode={darkMode} />}
           </AnimatePresence>
         </div>
 
-        {/* Home Indicator */}
-        <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 rounded-full ${
-          darkMode ? 'bg-[#2A2A2D]' : 'bg-gray-900'
-        }`}></div>
+        <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1.5 rounded-full ${
+          darkMode ? 'bg-white/20' : 'bg-gray-200'
+        }`} />
       </div>
     </div>
   );
